@@ -334,7 +334,7 @@ class ViewHandlerTest extends WebTestCase
         $request->attributes->set('_rest_view', new ViewAnnotation());
 
         $iterator = $this->prophesize(PagerIterator::class);
-        $iterator->getNextPageToken()->willReturn(new PageToken(new Chronos('1991-11-24 02:00:00'), 1, 1275024653));
+        $iterator->getNextPageToken()->willReturn(new PageToken((new Chronos('1991-11-24 02:00:00'))->getTimestamp(), 1, 1275024653));
         $iterator->rewind()->willReturn();
         $iterator->valid()->willReturn(false);
 
