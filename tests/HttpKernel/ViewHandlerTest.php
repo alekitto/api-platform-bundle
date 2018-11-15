@@ -347,7 +347,7 @@ class ViewHandlerTest extends WebTestCase
             ->shouldBeCalled();
 
         $event->setResponse(Argument::that(function ($response) {
-            return $response instanceof Response && '8tf0lkw0_1_l347bh' === $response->headers->get('X-Continuation-Token');
+            return $response instanceof Response && 'bfdew0_1_l347bh' === $response->headers->get('X-Continuation-Token');
         }))->shouldBeCalled();
 
         $this->viewHandler->onView($event->reveal());
