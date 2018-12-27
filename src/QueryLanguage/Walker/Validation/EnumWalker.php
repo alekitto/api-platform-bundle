@@ -26,7 +26,10 @@ class EnumWalker extends ValidationWalker
             return;
         }
 
-        throw new \InvalidArgumentException('Value not allowed');
+        $this->addViolation('Value {{ value }} is not allowed. Must be one of {{ allowed_values }}.', [
+            'value' => (string) $expression->getValue(),
+            'allowed_values' => implode(', ', $this->values),
+        ]);
     }
 
     /**
@@ -34,7 +37,7 @@ class EnumWalker extends ValidationWalker
      */
     public function walkOrder(string $field, string $direction)
     {
-        throw new \InvalidArgumentException('Operation unavailable');
+        $this->addViolation('Invalid operation');
     }
 
     /**
@@ -42,6 +45,6 @@ class EnumWalker extends ValidationWalker
      */
     public function walkEntry(string $key, ExpressionInterface $expression)
     {
-        throw new \InvalidArgumentException('Operation unavailable');
+        $this->addViolation('Invalid operation');
     }
 }

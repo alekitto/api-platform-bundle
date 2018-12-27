@@ -7,22 +7,18 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Fazland\ApiPlatformBundle\Doctrine\ObjectIterator;
 use Fazland\ApiPlatformBundle\Doctrine\ORM\EntityIterator;
-use Fazland\ApiPlatformBundle\Form\PageTokenType;
 use Fazland\ApiPlatformBundle\Pagination\Doctrine\ORM\PagerIterator;
-use Fazland\ApiPlatformBundle\QueryLanguage\Exception\SyntaxError;
 use Fazland\ApiPlatformBundle\QueryLanguage\Expression\OrderExpression;
-use Fazland\ApiPlatformBundle\QueryLanguage\Grammar\Grammar;
+use Fazland\ApiPlatformBundle\QueryLanguage\Form\DTO\Query;
+use Fazland\ApiPlatformBundle\QueryLanguage\Form\QueryType;
 use Fazland\ApiPlatformBundle\QueryLanguage\Processor\Column\Column;
 use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Doctrine\DqlWalker;
-use Fazland\ApiPlatformBundle\QueryLanguage\Walker\TreeWalkerInterface;
-use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Validation\ValidationWalkerInterface;
-use Symfony\Component\Form\Extension\Core\Type\FormType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
+use Symfony\Component\OptionsResolver\Options;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class DoctrineProcessor
 {
@@ -42,31 +38,6 @@ class DoctrineProcessor
     private $columns;
 
     /**
-     * @var null|string
-     */
-    private $orderField;
-
-    /**
-     * @var null|string
-     */
-    private $skipField;
-
-    /**
-     * @var null|string
-     */
-    private $limitField;
-
-    /**
-     * @var null|string
-     */
-    private $continuationTokenField;
-
-    /**
-     * @var null|string
-     */
-    private $checksumColumn;
-
-    /**
      * @var string
      */
     private $rootAlias;
@@ -81,11 +52,17 @@ class DoctrineProcessor
      */
     private $formFactory;
 
-    public function __construct(QueryBuilder $queryBuilder, FormFactoryInterface $formFactory)
+    /**
+     * @var array
+     */
+    private $options;
+
+    public function __construct(QueryBuilder $queryBuilder, FormFactoryInterface $formFactory, array $options = [])
     {
         $this->queryBuilder = $queryBuilder;
         $this->entityManager = $this->queryBuilder->getEntityManager();
         $this->columns = [];
+        $this->options = $this->resolveOptions($options);
 
         $this->rootAlias = $this->queryBuilder->getRootAliases()[0];
         $this->rootEntity = $this->entityManager->getClassMetadata($this->queryBuilder->getRootEntities()[0]);
@@ -93,98 +70,37 @@ class DoctrineProcessor
     }
 
     /**
+     * Adds a column to this list processor.
+     *
      * @param string $name
+     * @param array|string $fieldName
      *
      * @return $this
      */
-    public function enableOrderField(string $name = 'order'): self
+    public function addColumn(string $name, $options = []): self
     {
-        $this->orderField = $name;
-
-        return $this;
-    }
-
-    /**
-     * @param string $name
-     *
-     * @return $this
-     */
-    public function enableSkipField(string $name = 'skip'): self
-    {
-        $this->skipField = $name;
-
-        return $this;
-    }
-
-    /**
-     * @param string $name
-     *
-     * @return $this
-     */
-    public function enableLimitField(string $name = 'limit'): self
-    {
-        $this->limitField = $name;
-
-        return $this;
-    }
-
-    /**
-     * @param string      $name
-     * @param string|null $checksumColumn
-     *
-     * @return $this
-     */
-    public function enableContinuationToken(string $name = 'continue', ?string $checksumColumn = null): self
-    {
-        $this->continuationTokenField = $name;
-        $this->checksumColumn = $this->rootEntity->getIdentifierColumnNames()[0];
-
-        if (null !== $checksumColumn) {
-            $this->checksumColumn = $this->columns[$checksumColumn]->fieldName;
+        if (\is_string($options)) {
+            $options = ['field_name' => $options];
         }
 
-        return $this;
-    }
+        $resolver = new OptionsResolver();
+        $options = $resolver
+            ->setDefaults([
+                'field_name' => $name,
+                'walker' => null,
+                'validation_walker' => null,
+            ])
+            ->setAllowedTypes('field_name', 'string')
+            ->setAllowedTypes('walker', ['null', 'string', 'callable'])
+            ->setAllowedTypes('validation_walker', ['null', 'string', 'callable'])
+            ->resolve($options)
+        ;
 
-    /**
-     * @param string      $name
-     * @param string|null $fieldName
-     *
-     * @return $this
-     */
-    public function addColumn(string $name, ?string $fieldName = null): self
-    {
-        $this->columns[$name] = new Column($name, $fieldName ?? $name, $this->rootEntity, $this->entityManager);
+        $column = new Column($name, $options['field_name'], $this->rootEntity, $this->entityManager);
+        $column->customWalker = $options['walker'];
+        $column->validationWalker = $options['validation_walker'];
 
-        return $this;
-    }
-
-    /**
-     * @param string                         $column
-     * @param ValidationWalkerInterface|null $validationWalker
-     *
-     * @return $this
-     */
-    public function setValidationWalker(string $column, ?ValidationWalkerInterface $validationWalker): self
-    {
-        $this->columns[$column]->validationWalker = $validationWalker;
-
-        return $this;
-    }
-
-    /**
-     * @param string                                   $column
-     * @param TreeWalkerInterface|callable|string|null $customWalker
-     *
-     * @return $this
-     */
-    public function setCustomWalker(string $column, $customWalker = null): self
-    {
-        if (null !== $customWalker && ! \is_string($customWalker) && ! \is_callable($customWalker)) {
-            throw new \InvalidArgumentException('Custom walker must be either a class name, a callable or null.');
-        }
-
-        $this->columns[$column]->customWalker = $customWalker;
+        $this->columns[$name] = $column;
 
         return $this;
     }
@@ -201,11 +117,11 @@ class DoctrineProcessor
             return $result;
         }
 
-        $this->attachToQueryBuilder($result['filters']);
+        $this->attachToQueryBuilder($result->filters);
 
-        if (null !== $this->continuationTokenField && null !== $result['ordering']) {
-            $iterator = new PagerIterator($this->queryBuilder, $this->parseOrderings($result['ordering']));
-            $iterator->setToken($result['page_token']);
+        if (null !== $result->ordering) {
+            $iterator = new PagerIterator($this->queryBuilder, $this->parseOrderings($result->ordering));
+            $iterator->setToken($result->pageToken);
 
             return $iterator;
         }
@@ -216,77 +132,25 @@ class DoctrineProcessor
     /**
      * @param Request $request
      *
-     * @return array|FormInterface
+     * @return Query|FormInterface
      */
     private function handleRequest(Request $request)
     {
-        $form = $this->createForm()->handleRequest($request);
+        $dto = new Query();
+        $form = $this->formFactory->createNamed(null, QueryType::class, $dto, [
+            'limit_field' => $this->options['limit_field'],
+            'skip_field' => $this->options['skip_field'],
+            'order_field' => $this->options['order_field'],
+            'continuation_token_field' => $this->options['continuation_token']['field'] ?? null,
+            'columns' => $this->columns,
+        ]);
+
+        $form->handleRequest($request);
         if ($form->isSubmitted() && ! $form->isValid()) {
             return $form;
         }
 
-        $ordering = null;
-        $grammar = new Grammar();
-        $filters = [];
-        $formData = $form->getData();
-
-        if (null !== $this->orderField) {
-            $ordering = $formData[$this->orderField] ?? null;
-            unset($formData[$this->orderField]);
-
-            if (null !== $ordering && ! \is_string($ordering)) {
-                $form[$this->orderField]->addError(new FormError('This value is not valid'));
-            } elseif (null !== $ordering) {
-                try {
-                    $ordering = $grammar->parse($ordering);
-                } catch (SyntaxError $e) {
-                    $form[$this->orderField]->addError(new FormError('This value is not valid'));
-                }
-            }
-        }
-
-        foreach ($formData as $key => $filter) {
-            if (null === $filter || '' === $filter || ! isset($this->columns[$key])) {
-                continue;
-            }
-
-            if (! \is_string($filter)) {
-                $form[$key]->addError(new FormError('This value is not valid'));
-                continue;
-            }
-
-            try {
-                $expression = $grammar->parse($filter);
-            } catch (SyntaxError $exception) {
-                $form[$key]->addError(new FormError($exception->getMessage()));
-                continue;
-            }
-
-            $column = $this->columns[$key];
-
-            if (null !== $column->validationWalker) {
-                try {
-                    $expression->dispatch($column->validationWalker);
-                } catch (\Throwable $e) {
-                    $form[$key]->addError(new FormError($e->getMessage()));
-                    continue;
-                }
-            }
-
-            $filters[$key] = $expression;
-        }
-
-        if (null !== $ordering &&
-            (! $ordering instanceof OrderExpression || ! \array_key_exists($ordering->getField(), $this->columns))
-        ) {
-            $form[$this->orderField]->addError(new FormError('This value is not valid'));
-        }
-
-        if ($form->isSubmitted() && ! $form->isValid()) {
-            return $form;
-        }
-
-        return ['filters' => $filters, 'ordering' => $ordering, 'page_token' => $form[$this->continuationTokenField]->getData()];
+        return $dto;
     }
 
     /**
@@ -356,42 +220,60 @@ class DoctrineProcessor
 
     private function parseOrderings(OrderExpression $ordering): array
     {
+        $checksumColumn = $this->rootEntity->getIdentifierColumnNames()[0];
+        if (isset($this->options['continuation_token']['checksum_field'])) {
+            $checksumColumn = $this->columns[$checksumColumn]->fieldName;
+        }
+
         $fieldName = $this->columns[$ordering->getField()]->fieldName;
         $direction = $ordering->getDirection();
 
         return [
             $fieldName => $direction,
-            $this->checksumColumn => 'ASC',
+            $checksumColumn => 'ASC',
         ];
     }
 
-    private function createForm(): FormInterface
+    /**
+     * Resolves options for this processor.
+     *
+     * @param array $options
+     *
+     * @return array
+     */
+    private function resolveOptions(array $options): array
     {
-        $builder = $this->formFactory->createNamedBuilder(null, FormType::class, [], [
-            'allow_extra_fields' => true,
-            'method' => Request::METHOD_GET,
-        ]);
+        $resolver = new OptionsResolver();
 
-        foreach ($this->columns as $key => $column) {
-            $builder->add($key, TextType::class);
+        foreach (['order_field', 'skip_field', 'limit_field'] as $field) {
+            $resolver
+                ->setDefined($field)
+                ->setAllowedTypes($field, ['null', 'string'])
+            ;
         }
 
-        if (null !== $this->orderField) {
-            $builder->add($this->orderField, TextType::class);
-        }
+        $resolver
+            ->setDefault('continuation_token', [
+                'field' => 'continue',
+                'checksum_field' => null,
+            ])
+            ->setAllowedTypes('continuation_token', ['bool', 'array'])
+            ->setNormalizer('continuation_token', function (Options $options, $value): array {
+                if (true === $value) {
+                    return [
+                        'field' => 'continue',
+                        'checksum_field' => null,
+                    ];
+                }
 
-        if (null !== $this->skipField) {
-            $builder->add($this->skipField, IntegerType::class);
-        }
+                if (! isset($value['field'])) {
+                    throw new InvalidOptionsException('Continuation token field must be set');
+                }
 
-        if (null !== $this->limitField) {
-            $builder->add($this->limitField, IntegerType::class);
-        }
+                return $value;
+            })
+        ;
 
-        if (null !== $this->continuationTokenField) {
-            $builder->add($this->continuationTokenField, PageTokenType::class);
-        }
-
-        return $builder->getForm();
+        return $resolver->resolve($options);
     }
 }

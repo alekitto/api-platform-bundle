@@ -34,7 +34,7 @@ class Column
     public $associations;
 
     /**
-     * @var null|ValidationWalkerInterface
+     * @var null|string|callable
      */
     public $validationWalker;
 
@@ -62,7 +62,9 @@ class Column
         if (null === $rootField) {
             if (isset($rootEntity->discriminatorColumn['name']) && $fieldName === $rootEntity->discriminatorColumn['name']) {
                 $this->discriminator = true;
-                $this->validationWalker = new EnumWalker(\array_keys($rootEntity->discriminatorMap));
+                $this->validationWalker = function () use ($rootEntity): EnumWalker {
+                    return new EnumWalker(\array_keys($rootEntity->discriminatorMap));
+                };
                 $this->customWalker = DiscriminatorWalker::class;
             } else {
                 throw new \Exception();
