@@ -72,7 +72,7 @@ class DoctrineProcessor
     /**
      * Adds a column to this list processor.
      *
-     * @param string $name
+     * @param string       $name
      * @param array|string $fieldName
      *
      * @return $this
@@ -97,8 +97,14 @@ class DoctrineProcessor
         ;
 
         $column = new Column($name, $options['field_name'], $this->rootEntity, $this->entityManager);
-        $column->customWalker = $options['walker'];
-        $column->validationWalker = $options['validation_walker'];
+
+        if (null !== $options['walker']) {
+            $column->customWalker = $options['walker'];
+        }
+
+        if (null !== $options['validation_walker']) {
+            $column->validationWalker = $options['validation_walker'];
+        }
 
         $this->columns[$name] = $column;
 

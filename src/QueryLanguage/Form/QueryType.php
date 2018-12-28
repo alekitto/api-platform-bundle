@@ -15,12 +15,12 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 class QueryType extends AbstractType
 {
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         if (null !== $options['order_field']) {
-            $builder->add($options['order_field'], FieldType::class, [ 'property_path' => 'ordering' ]);
+            $builder->add($options['order_field'], FieldType::class, ['property_path' => 'ordering']);
         }
 
         if (null !== $options['continuation_token_field']) {
@@ -39,7 +39,7 @@ class QueryType extends AbstractType
         foreach ($options['columns'] as $key => $column) {
             $builder->add($key, FieldType::class, [
                 'constraints' => [
-                    new Expression($column->validationWalker)
+                    new Expression($column->validationWalker),
                 ],
                 'property_path' => 'filters['.$key.']',
             ]);
@@ -47,7 +47,7 @@ class QueryType extends AbstractType
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function configureOptions(OptionsResolver $resolver): void
     {
@@ -68,5 +68,4 @@ class QueryType extends AbstractType
             ->setRequired('columns')
         ;
     }
-
 }

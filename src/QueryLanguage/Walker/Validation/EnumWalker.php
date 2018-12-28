@@ -28,7 +28,7 @@ class EnumWalker extends ValidationWalker
 
         $this->addViolation('Value {{ value }} is not allowed. Must be one of {{ allowed_values }}.', [
             'value' => (string) $expression->getValue(),
-            'allowed_values' => implode(', ', $this->values),
+            'allowed_values' => \implode(', ', $this->values),
         ]);
     }
 

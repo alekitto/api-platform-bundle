@@ -82,7 +82,7 @@ class ValidationWalker implements ValidationWalkerInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function setValidationContext(ExecutionContextInterface $context): void
     {

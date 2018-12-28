@@ -21,9 +21,7 @@ class StringToExpresionTransformer implements DataTransformerInterface
     }
 
     /**
-     * @inheritDoc
-     *
-     * @param ExpressionInterface $value
+     * {@inheritdoc}
      */
     public function transform($value): string
     {
@@ -32,14 +30,14 @@ class StringToExpresionTransformer implements DataTransformerInterface
         }
 
         if (! $value instanceof ExpressionInterface) {
-            throw new TransformationFailedException('Expected '. ExpressionInterface::class);
+            throw new TransformationFailedException('Expected '.ExpressionInterface::class);
         }
 
         return (string) $value;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function reverseTransform($value): ?ExpressionInterface
     {

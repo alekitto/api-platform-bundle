@@ -16,4 +16,12 @@ class Expression extends Constraint
      * @Required()
      */
     public $walker;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultOption(): string
+    {
+        return 'walker';
+    }
 }

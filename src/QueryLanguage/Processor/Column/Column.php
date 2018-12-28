@@ -6,7 +6,6 @@ use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 use Doctrine\ORM\EntityManagerInterface;
 use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Doctrine\DiscriminatorWalker;
 use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Validation\EnumWalker;
-use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Validation\ValidationWalkerInterface;
 
 /**
  * @internal

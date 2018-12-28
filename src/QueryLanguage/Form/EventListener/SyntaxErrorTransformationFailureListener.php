@@ -27,7 +27,7 @@ class SyntaxErrorTransformationFailureListener implements EventSubscriberInterfa
     public static function getSubscribedEvents(): array
     {
         return [
-            FormEvents::POST_SUBMIT => ['convertTransformationFailureToFormError', -100]
+            FormEvents::POST_SUBMIT => ['convertTransformationFailureToFormError', 100]
         ];
     }
 
@@ -54,18 +54,16 @@ class SyntaxErrorTransformationFailureListener implements EventSubscriberInterfa
         $clientDataAsString = is_scalar($form->getViewData()) ? (string)$form->getViewData() : \gettype($form->getViewData());
         $previous = $failure->getPrevious();
 
-        if ($previous instanceof SyntaxError) {
-            $messageTemplate = $previous->getMessage();
-        } else {
-            $messageTemplate = 'The value {{ value }} is not valid.';
+        do {
+            if ($previous instanceof SyntaxError) {
+                break;
+            }
+        } while (null !== $previous = $previous->getPrevious());
+
+        if (null === $previous) {
+            return;
         }
 
-        if (null !== $this->translator) {
-            $message = $this->translator->trans($messageTemplate, array('{{ value }}' => $clientDataAsString));
-        } else {
-            $message = strtr($messageTemplate, array('{{ value }}' => $clientDataAsString));
-        }
-
-        $form->addError(new FormError($message, $messageTemplate, array('{{ value }}' => $clientDataAsString), null, $failure));
+        $form->addError(new FormError($previous->getMessage(), $previous->getMessage(), array('{{ value }}' => $clientDataAsString), null, $failure));
     }
 }
