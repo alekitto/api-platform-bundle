@@ -35,4 +35,9 @@ class Query
      * @var int
      */
     public $limit;
+
+    public function __construct()
+    {
+        $this->filters = [];
+    }
 }

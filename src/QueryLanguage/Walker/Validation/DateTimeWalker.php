@@ -15,7 +15,7 @@ class DateTimeWalker extends ValidationWalker
             new \DateTimeImmutable($expression->getValue());
         } catch (\Exception $e) {
             $this->addViolation('{{ value }} is not a valid date time', [
-                'value' => (string) $expression->getValue(),
+                '{{ value }}' => (string) $expression->getValue(),
             ]);
         }
     }

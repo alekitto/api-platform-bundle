@@ -253,7 +253,7 @@ class DoctrineProcessor
 
         foreach (['order_field', 'skip_field', 'limit_field'] as $field) {
             $resolver
-                ->setDefined($field)
+                ->setDefault($field, null)
                 ->setAllowedTypes($field, ['null', 'string'])
             ;
         }
