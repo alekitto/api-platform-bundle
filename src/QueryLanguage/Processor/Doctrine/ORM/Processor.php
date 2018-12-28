@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Fazland\ApiPlatformBundle\QueryLanguage\Processor;
+namespace Fazland\ApiPlatformBundle\QueryLanguage\Processor\Doctrine\ORM;
 
 use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 use Doctrine\ORM\EntityManagerInterface;
@@ -8,10 +8,10 @@ use Doctrine\ORM\QueryBuilder;
 use Fazland\ApiPlatformBundle\Doctrine\ObjectIterator;
 use Fazland\ApiPlatformBundle\Doctrine\ORM\EntityIterator;
 use Fazland\ApiPlatformBundle\Pagination\Doctrine\ORM\PagerIterator;
+use Fazland\ApiPlatformBundle\QueryLanguage\Expression\ExpressionInterface;
 use Fazland\ApiPlatformBundle\QueryLanguage\Expression\OrderExpression;
 use Fazland\ApiPlatformBundle\QueryLanguage\Form\DTO\Query;
 use Fazland\ApiPlatformBundle\QueryLanguage\Form\QueryType;
-use Fazland\ApiPlatformBundle\QueryLanguage\Processor\Column\Column;
 use Fazland\ApiPlatformBundle\QueryLanguage\Walker\Doctrine\DqlWalker;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
@@ -20,7 +20,7 @@ use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class DoctrineProcessor
+class Processor
 {
     /**
      * @var QueryBuilder
@@ -73,7 +73,7 @@ class DoctrineProcessor
      * Adds a column to this list processor.
      *
      * @param string       $name
-     * @param array|string $fieldName
+     * @param array|string $options
      *
      * @return $this
      */
@@ -160,6 +160,8 @@ class DoctrineProcessor
     }
 
     /**
+     * Add conditions to query builder.
+     *
      * @param array $filters
      */
     private function attachToQueryBuilder(array $filters): void
@@ -168,62 +170,97 @@ class DoctrineProcessor
 
         foreach ($filters as $key => $expr) {
             $column = $this->columns[$key];
-            $alias = $column->discriminator ? null : $column->getMappingFieldName();
-            $walker = $column->customWalker;
 
             if ($column->isAssociation()) {
-                $subQb = $this->entityManager->createQueryBuilder()
-                    ->select('1')
-                    ->from($column->getTargetEntity(), $alias)
-                    ->setParameters($this->queryBuilder->getParameters())
-                ;
-
-                $currentFieldName = $alias;
-                $currentAlias = $alias;
-                foreach ($column->associations as $association) {
-                    if (isset($association['targetEntity'])) {
-                        $currentAlias = $association['fieldName'];
-                        $currentFieldName = $association['fieldName'];
-                        $subQb->join($currentFieldName.'.'.$association['fieldName'], $association['fieldName']);
-                    } else {
-                        $currentFieldName = $currentAlias.'.'.$association['fieldName'];
-                    }
-                }
-
-                if (null !== $walker) {
-                    $walker = \is_string($walker) ? new $walker($subQb, $currentFieldName) : $walker($subQb, $currentFieldName);
-                } else {
-                    $walker = new DqlWalker($subQb, $currentFieldName);
-                }
-
-                $subQb->where($expr->dispatch($walker));
-
-                if ($column->isManyToMany()) {
-                    // Many-to-Many
-                    dd($column);
-                } elseif ($column->isOwningSide()) {
-                    $subQb->andWhere($subQb->expr()->eq($this->rootAlias.'.'.$alias, $alias));
-                } else {
-                    $subQb->andWhere($subQb->expr()->eq($alias.'.'.$column->mapping['inversedBy'], $this->rootAlias));
-                }
-
-                $this->queryBuilder
-                    ->andWhere($this->queryBuilder->expr()->exists($subQb->getDQL()))
-                    ->setParameters($subQb->getParameters())
-                ;
+                $this->addAssociationCondition($column, $expr);
             } else {
-                $fieldName = $column->discriminator ? $this->rootAlias : $this->rootAlias.'.'.$alias;
-                if (null !== $walker) {
-                    $walker = \is_string($walker) ? new $walker($this->queryBuilder, $fieldName) : $walker($this->queryBuilder, $fieldName);
-                } else {
-                    $walker = new DqlWalker($this->queryBuilder, $fieldName);
-                }
-
-                $this->queryBuilder->andWhere($expr->dispatch($walker));
+                $this->addWhereCondition($column, $expr);
             }
         }
     }
 
+    /**
+     * Processes an association column and attaches the conditions to the query builder.
+     *
+     * @param Column              $column
+     * @param ExpressionInterface $expression
+     */
+    private function addAssociationCondition(Column $column, ExpressionInterface $expression): void
+    {
+        $alias = $column->getMappingFieldName();
+        $walker = $column->customWalker;
+
+        $subQb = $this->entityManager->createQueryBuilder()
+            ->select('1')
+            ->from($column->getTargetEntity(), $alias)
+            ->setParameters($this->queryBuilder->getParameters())
+        ;
+
+        $currentFieldName = $alias;
+        $currentAlias = $alias;
+        foreach ($column->associations as $association) {
+            if (isset($association['targetEntity'])) {
+                $currentAlias = $association['fieldName'];
+                $currentFieldName = $association['fieldName'];
+                $subQb->join($currentFieldName.'.'.$association['fieldName'], $association['fieldName']);
+            } else {
+                $currentFieldName = $currentAlias.'.'.$association['fieldName'];
+            }
+        }
+
+        if (null !== $walker) {
+            $walker = \is_string($walker) ? new $walker($subQb, $currentFieldName) : $walker($subQb, $currentFieldName);
+        } else {
+            $walker = new DqlWalker($subQb, $currentFieldName);
+        }
+
+        $subQb->where($expression->dispatch($walker));
+
+        if ($column->isManyToMany()) {
+            // Many-to-Many
+            throw new \Exception('Not implemented yet.');
+        }
+
+        if ($column->isOwningSide()) {
+            $subQb->andWhere($subQb->expr()->eq($this->rootAlias.'.'.$alias, $alias));
+        } else {
+            $subQb->andWhere($subQb->expr()->eq($alias.'.'.$column->mapping['inversedBy'], $this->rootAlias));
+        }
+
+        $this->queryBuilder
+            ->andWhere($this->queryBuilder->expr()->exists($subQb->getDQL()))
+            ->setParameters($subQb->getParameters())
+        ;
+    }
+
+    /**
+     * Adds a simple condition to the query builder.
+     *
+     * @param Column              $column
+     * @param ExpressionInterface $expression
+     */
+    private function addWhereCondition(Column $column, ExpressionInterface $expression): void
+    {
+        $alias = $column->discriminator ? null : $column->getMappingFieldName();
+        $walker = $column->customWalker;
+
+        $fieldName = $column->discriminator ? $this->rootAlias : $this->rootAlias.'.'.$alias;
+        if (null !== $walker) {
+            $walker = \is_string($walker) ? new $walker($this->queryBuilder, $fieldName) : $walker($this->queryBuilder, $fieldName);
+        } else {
+            $walker = new DqlWalker($this->queryBuilder, $fieldName);
+        }
+
+        $this->queryBuilder->andWhere($expression->dispatch($walker));
+    }
+
+    /**
+     * Parses the ordering expression for continuation token.
+     *
+     * @param OrderExpression $ordering
+     *
+     * @return array
+     */
     private function parseOrderings(OrderExpression $ordering): array
     {
         $checksumColumn = $this->rootEntity->getIdentifierColumnNames()[0];

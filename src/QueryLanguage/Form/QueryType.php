@@ -4,7 +4,7 @@ namespace Fazland\ApiPlatformBundle\QueryLanguage\Form;
 
 use Fazland\ApiPlatformBundle\Form\PageTokenType;
 use Fazland\ApiPlatformBundle\QueryLanguage\Form\DTO\Query;
-use Fazland\ApiPlatformBundle\QueryLanguage\Processor\Column\Column;
+use Fazland\ApiPlatformBundle\QueryLanguage\Processor\ColumnInterface;
 use Fazland\ApiPlatformBundle\QueryLanguage\Validator\Expression;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -35,11 +35,11 @@ class QueryType extends AbstractType
             $builder->add($options['limit_field'], IntegerType::class, ['property_path' => 'limit']);
         }
 
-        /** @var Column $column */
+        /** @var ColumnInterface $column */
         foreach ($options['columns'] as $key => $column) {
             $builder->add($key, FieldType::class, [
                 'constraints' => [
-                    new Expression($column->validationWalker),
+                    new Expression($column->getValidationWalker()),
                 ],
                 'property_path' => 'filters['.$key.']',
             ]);
