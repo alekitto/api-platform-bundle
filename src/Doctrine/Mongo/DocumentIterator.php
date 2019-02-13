@@ -8,7 +8,7 @@ use Fazland\ApiPlatformBundle\Doctrine\ObjectIterator;
 use Fazland\ApiPlatformBundle\Doctrine\Traits\IteratorTrait;
 
 /**
- * This class allows iterating a query iterator for a single entity query.
+ * This class allows iterating a query iterator for a single document query.
  */
 class DocumentIterator implements ObjectIterator
 {
